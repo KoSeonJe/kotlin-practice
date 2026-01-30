@@ -30,11 +30,14 @@ TDD(Test-Driven Development) 방식으로 코틀린 문법을 학습하는 미�
 
 **테스트 예시**:
 ```kotlin
+// JUnit5 스타일
 @Test
 fun `계좌 생성 시 기본 잔액은 0이다`() {
     val account = Account("123-456", "홍길동")
-    assertEquals(0L, account.balance)
+    account.balance shouldBe 0L  // Kotest assertion
 }
+
+// 또는 assertEquals(0L, account.balance) - 기본 JUnit
 ```
 
 ---
@@ -51,17 +54,24 @@ fun `계좌 생성 시 기본 잔액은 0이다`() {
 
 **테스트 예시**:
 ```kotlin
+// 입금 성공
 @Test
 fun `1000원 입금하면 잔액이 1000원이 된다`() {
+    // given
     val account = Account("123-456", "홍길동")
+
+    // when
     account.deposit(1000L)
-    assertEquals(1000L, account.balance)
+
+    // then
+    account.balance shouldBe 1000L
 }
 
+// 예외 검증 (Kotest 스타일)
 @Test
 fun `0원 이하 입금 시 예외 발생`() {
     val account = Account("123-456", "홍길동")
-    assertThrows<IllegalArgumentException> {
+    shouldThrow<IllegalArgumentException> {
         account.deposit(0L)
     }
 }
@@ -78,6 +88,19 @@ fun `0원 이하 입금 시 예외 발생`() {
 - 출금액이 0 이하면 IllegalArgumentException
 - 잔액 부족하면 IllegalStateException
 - 출금 후 남은 잔액 반환
+```
+
+**테스트 예시**:
+```kotlin
+@Test
+fun `잔액이 부족하면 출금할 수 없다`() {
+    val account = Account("123-456", "홍길동")
+    account.deposit(500L)
+
+    shouldThrow<IllegalStateException> {
+        account.withdraw(1000L)
+    }
+}
 ```
 
 ---
@@ -115,7 +138,25 @@ fun `입금 거래 내역만 조회한다`() {
     account.withdraw(500L)
 
     val deposits = account.getTransactionsByType<Transaction.Deposit>()
-    assertEquals(2, deposits.size)
+
+    deposits shouldHaveSize 2  // Kotest: 리스트 크기 검증
+    deposits shouldBe listOf(
+        Transaction.Deposit(1000L),
+        Transaction.Deposit(2000L)
+    )  // Kotest: 리스트 내용 검증
+}
+
+@Test
+fun `총 입금액을 계산한다`() {
+    val account = Account("123-456", "홍길동")
+    account.deposit(1000L)
+    account.deposit(2000L)
+
+    val totalDeposit = account.transactions
+        .filterIsInstance<Transaction.Deposit>()
+        .sumOf { it.amount }
+
+    totalDeposit shouldBe 3000L  // Kotlin 컬렉션 + Kotest assertion
 }
 ```
 
@@ -168,26 +209,88 @@ src/
 
 ## 테스트 작성 팁
 
-### 테스트 네이밍 (한글 추천)
+### 1. JUnit5 + Kotlin (기본)
+
 ```kotlin
-@Test
-fun `잔액이 부족하면 출금할 수 없다`() { }
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.DisplayName
+
+class AccountTest {
+    @Test
+    @DisplayName("계좌 생성 시 기본 잔액은 0이다")
+    fun `계좌 생성 시 기본 잔액은 0이다`() {
+        val account = Account("123-456", "홍길동")
+        assertEquals(0L, account.balance)
+    }
+
+    @Test
+    fun `입금 후 잔액이 증가한다`() {
+        // given
+        val account = Account("123-456", "홍길동")
+
+        // when
+        account.deposit(1000L)
+
+        // then
+        assertEquals(1000L, account.balance)
+    }
+
+    @Test
+    fun `0원 이하 입금 시 예외 발생`() {
+        val account = Account("123-456", "홍길동")
+        assertThrows<IllegalArgumentException> {
+            account.deposit(0L)
+        }
+    }
+}
 ```
 
-### Given-When-Then 패턴
+### 2. Kotest (Kotlin 전용 - 추천)
+
 ```kotlin
-@Test
-fun `1000원 입금 후 500원 출금하면 잔액은 500원`() {
-    // Given: 초기 상태
-    val account = Account("123-456", "홍길동")
+import io.kotest.core.spec.style.BehaviorSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.assertions.throwables.shouldThrow
 
-    // When: 행동
-    account.deposit(1000L)
-    account.withdraw(500L)
+class AccountBehaviorTest : BehaviorSpec({
+    given("새로운 계좌가") {
+        val account = Account("123-456", "홍길동")
 
-    // Then: 검증
-    assertEquals(500L, account.balance)
+        `when`("계좌를 생성하면") {
+            then("기본 잔액은 0이다") {
+                account.balance shouldBe 0L
+            }
+        }
+
+        `when`("입금을 하면") {
+            account.deposit(1000L)
+            then("잔액이 증가한다") {
+                account.balance shouldBe 1000L
+            }
+        }
+    }
+})
+```
+
+### 3. kotest-assertions (Kotlin DSL)
+
+```kotlin
+// 단순 비교
+account.balance shouldBe 1000L
+
+// 예외 검증
+shouldThrow<IllegalArgumentException> {
+    account.deposit(-100L)
 }
+
+// null 검증
+account.owner shouldNotBe null
+
+// 리스트 검증
+transactions shouldHaveSize 3
+transactions shouldContain deposit
 ```
 
 ### 경계값 테스트
@@ -197,14 +300,44 @@ fun `1000원 입금 후 500원 출금하면 잔액은 500원`() {
 
 ---
 
+## 테스트 의존성 설정
+
+### build.gradle.kts
+```kotlin
+dependencies {
+    // 기본 JUnit5
+    testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
+
+    // Kotest (선택)
+    testImplementation("io.kotest:kotest-runner-junit5:5.8.0")
+    testImplementation("io.kotest:kotest-assertions-core:5.8.0")
+}
+```
+
+## 테스트 스타일 선택 가이드
+
+| 상황 | 추천 방식 |
+|------|----------|
+| 빠른 시작 | JUnit5 + 한글 함수명 |
+| BDD 스타일 | Kotest BehaviorSpec |
+| 복잡한 시나리오 | Kotest FunSpec |
+| 풍부한 assertion | kotest-assertions |
+
 ## 실행 방법
 
 ```bash
-# 테스트 실행
-./gradlew test
+# 모든 테스트 실행
+./gradlew :kotlin-basic:test
 
 # 특정 테스트만 실행
-./gradlew test --tests "bank.AccountTest"
+./gradlew :kotlin-basic:test --tests "AccountTest"
+
+# Kotest로 실행
+./gradlew :kotlin-basic:test --tests "AccountBehaviorTest"
+
+# 테스트 리포트 보기
+open kotlin-basic/build/reports/tests/test/index.html
 ```
 
 ---
