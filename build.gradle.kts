@@ -1,23 +1,12 @@
 plugins {
-    kotlin("jvm") version "1.9.22"
+    kotlin("jvm") version "1.9.22" apply false
 }
 
-group = "com.example"
-version = "1.0-SNAPSHOT"
+allprojects {
+    group = "com.example"
+    version = "1.0-SNAPSHOT"
 
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
-}
-
-tasks.test {
-    useJUnitPlatform()
-}
-
-kotlin {
-    jvmToolchain(17)
+    repositories {
+        mavenCentral()
+    }
 }
