@@ -8,6 +8,12 @@ application {
 }
 
 dependencies {
+    // 코루틴 (Phase 3 학습용)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+
+    // 리플렉션 (Phase 3 학습용)
+    implementation(kotlin("reflect"))
+
     // Kotlin 테스트 기본 라이브러리
     testImplementation(kotlin("test"))
 
